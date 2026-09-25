@@ -1,0 +1,17 @@
+[Unit]
+Description=LuckyPepe pool: payment processor (sendmany from the pool wallet; emergency brake: deployment/pause-payments.sh)
+After=lpepe-pool-redis.service lpepe-node.service
+Requires=lpepe-pool-redis.service
+[Service]
+Type=simple
+User=lpepepool
+WorkingDirectory=/opt/lpepe-nodejs-pool
+ExecStart=/usr/bin/node /opt/lpepe-nodejs-pool/init.js -module=payments
+Restart=always
+RestartSec=15
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

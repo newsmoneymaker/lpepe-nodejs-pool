@@ -1,0 +1,17 @@
+[Unit]
+Description=LuckyPepe pool: charts data collector (hash rate, difficulty, miners, workers on the home page)
+After=lpepe-pool-redis.service lpepe-pool-api.service
+Requires=lpepe-pool-redis.service
+[Service]
+Type=simple
+User=lpepepool
+WorkingDirectory=/opt/lpepe-nodejs-pool
+ExecStart=/usr/bin/node /opt/lpepe-nodejs-pool/init.js -module=chartsDataCollector
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
