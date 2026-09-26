@@ -1,6 +1,9 @@
 // Against the REAL synchronised mainnet node: a block built by lib/blockBuilder.js from the node's own getblocktemplate (any nonce) is put to the node as a
-// block proposal (getblocktemplate mode "proposal": the node validates everything but the proof of work: coinbase, the developer output,
-// the merkle root, the header fields). The answer must be null. Needs a running luckypeped (config.node like the pool's) and a valid pool address.
+// block proposal (getblocktemplate mode "proposal": the node validates everything but the proof of work: coinbase, the mandatory 7% dev fund output,
+// the merkle root, the header fields). The answer must be null. Needs a running node (config.node like the pool's) and a valid pool address.
+// Note: unlike some other Bitcoin-Core forks (e.g. Yenten's `developer` field), LuckyPepe's own getblocktemplate does NOT expose the dev fund split as a
+// field - `coinbasevalue` is already only vout[0] (the miner's own share). The pool recomputes the split itself (lib/reward.js) from the height and the
+// previous block's hash, exactly mirroring the node's GetBlockSubsidy; this test proves that recomputation produces a block the real node accepts.
 // Run: node test/test-lpepe-proposal.js [config.json]
 const path = require('path');
 const fs = require('fs');
@@ -8,6 +11,7 @@ global.config = JSON.parse(fs.readFileSync(process.argv[2] || path.join(__dirnam
 const rpc = require('../lib/lpepeRpc.js');
 const builder = require('../lib/blockBuilder.js');
 const utils = require('../lib/utils.js');
+const reward = require('../lib/reward.js');
 let failed = 0;
 const check = (name, ok, extra) => { console.log((ok ? 'PASS  ' : 'FAIL  ') + name + (extra !== undefined ? '  ' + extra : '')); if (!ok) failed++; };
 const call = (m, p) => new Promise((res, rej) => rpc.call(m, p, (e, r) => e ? rej(e) : res(r)));
@@ -17,7 +21,9 @@ const call = (m, p) => new Promise((res, rej) => rpc.call(m, p, (e, r) => e ? re
 	check('the pool address of the config is valid', !!poolScript, config.poolServer.poolAddress);
 	if (!poolScript) process.exit(1);
 	const t = await call('getblocktemplate', [{rules: ['segwit']}]);
-	check('the node gives a template with the developer output', t.coinbasevalue > 0 && !!(t.developer && t.developer.amount > 0), 'height ' + t.height + ', developer ' + JSON.stringify(t.developer));
+	const split = reward.split(t.height, t.previousblockhash);
+	check('the template has a positive coinbasevalue and the computed dev fund is positive', t.coinbasevalue > 0 && split.devFund > 0n,
+		'height ' + t.height + ', coinbasevalue ' + t.coinbasevalue + ', computed devFund ' + split.devFund);
 	const job = builder.buildJob(t, poolScript, 8, config.poolServer.coinbaseTag);
 	const extra = Buffer.from('0102030405060708', 'hex');
 	const cb = builder.coinbaseFor(job, extra);
